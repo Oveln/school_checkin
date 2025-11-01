@@ -37,6 +37,8 @@ bun install
 在项目根目录创建 `.env` 文件，并添加以下环境变量：
 
 ```env
+# 用户名设置
+USER_NAME=your_name
 # Redis 配置
 REDIS_TOKEN=your_redis_password
 REDIS_ADDR=your_redis_address:port

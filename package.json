@@ -2,12 +2,20 @@
 	"name": "school_checkin",
 	"version": "1.0.0",
 	"description": "获取wx_code:\r https://lp.open.weixin.qq.com/connect/l/qrconnect?uuid=021a8ujs2zXWZv3S&last=404",
-	"main": "main.js",
+	"main": "dist/main.js",
 	"type": "module",
 	"scripts": {
-		"start": "bun run main.js"
+		"start": "bun run dist/main.js",
+		"dev": "bun run src/main.ts",
+		"build": "tsc",
+		"build:watch": "tsc --watch",
+		"lint": "eslint src/**/*.ts",
+		"lint:fix": "eslint src/**/*.ts --fix",
+		"format": "prettier --write src/**/*.ts",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist"
 	},
-	"keywords": [],
+	"keywords": ["typescript", "school", "checkin", "automation", "wechat"],
 	"author": "",
 	"license": "ISC",
 	"dependencies": {
@@ -20,6 +28,23 @@
 		"qrcode-terminal": "^0.12.0",
 		"redis": "^5.9.0",
 		"sharp": "^0.34.4",
-		"terminal-image": "^4.1.0"
+		"terminal-image": "^4.1.0",
+		"zod": "^4.1.12"
+	},
+	"devDependencies": {
+		"@types/node": "^24.10.0",
+		"@types/nodemailer": "^7.0.3",
+		"@types/pngjs": "^6.0.5",
+		"@types/qrcode-terminal": "^0.12.2",
+		"@typescript-eslint/eslint-plugin": "^8.46.3",
+		"@typescript-eslint/parser": "^8.46.3",
+		"@vitest/ui": "^4.0.6",
+		"eslint": "^9.39.1",
+		"eslint-config-prettier": "^10.1.8",
+		"eslint-plugin-prettier": "^5.5.4",
+		"jsdom": "^27.1.0",
+		"prettier": "^3.6.2",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.6"
 	}
 }

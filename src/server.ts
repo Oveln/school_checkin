@@ -85,7 +85,7 @@ app.use(express.json());
 /**
  * 启动Express服务器
  */
-async function startServer(port: number = 3000): Promise<void> {
+async function startServer(port: number = parseInt(process.env['PORT'] || '3000', 10)): Promise<void> {
   try {
     // 验证配置
     validateConfig();
@@ -538,8 +538,8 @@ app.get('/api/session-stats', (_req, res) => {
 
 // 启动服务器
 if (import.meta.url === `file://${process.argv[1]}`) {
-  
-  startServer();
+  const port = parseInt(process.env['PORT'] || '3000', 10);
+  startServer(port);
 }
 
 export { app, server, startServer };

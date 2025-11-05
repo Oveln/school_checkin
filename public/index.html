@@ -274,6 +274,26 @@
                 </div>
             </div>
 
+            <!-- 调度器状态 -->
+            <div class="status-section">
+                <div id="schedulerStatus" class="status-badge">检查中...</div>
+                <div id="schedulerInfo" class="token-info hidden">
+                    <h3>🕐 定时任务调度器</h3>
+                    <div class="token-info-item">
+                        <span>调度器状态:</span>
+                        <span id="schedulerRunning">-</span>
+                    </div>
+                    <div class="token-info-item">
+                        <span>每日签到:</span>
+                        <span id="checkinJobStatus">-</span>
+                    </div>
+                    <div class="token-info-item">
+                        <span>下次签到:</span>
+                        <span id="nextCheckinTime">-</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- 消息显示区域 -->
             <div id="messageArea"></div>
 
@@ -302,8 +322,21 @@
                 <button id="sendEmailBtn" class="button button-secondary" onclick="sendReauthEmail()">
                     📧 发送重新授权邮件
                 </button>
-                <button id="refreshBtn" class="button button-secondary" onclick="refreshTokenStatus()">
+                <button id="refreshBtn" class="button button-secondary" onclick="refreshStatus()">
                     🔄 刷新状态
+                </button>
+            </div>
+
+            <!-- 调度器管理按钮 -->
+            <div class="actions" style="margin-top: 15px;">
+                <button id="triggerCheckinBtn" class="button button-secondary" onclick="triggerScheduledCheckin()">
+                    🕐 触发定时签到
+                </button>
+                <button id="startSchedulerBtn" class="button button-secondary" onclick="startScheduler()">
+                    ▶️ 启动调度器
+                </button>
+                <button id="stopSchedulerBtn" class="button button-secondary" onclick="stopScheduler()">
+                    ⏸️ 停止调度器
                 </button>
             </div>
 
@@ -381,6 +414,18 @@
             }
         }
 
+        // 检查调度器状态
+        async function checkSchedulerStatus() {
+            try {
+                const response = await fetch('/api/scheduler-status');
+                const data = await response.json();
+                updateSchedulerStatus(data);
+            } catch (error) {
+                console.error('Failed to check scheduler status:', error);
+                showMessage('检查调度器状态失败', 'error');
+            }
+        }
+
         // 更新Token状态显示
         function updateTokenStatus(data) {
             const statusBadge = document.getElementById('tokenStatus');
@@ -419,6 +464,31 @@
                 document.getElementById('generateQR').disabled = false;
                 document.getElementById('checkinBtn').disabled = true;
             }
+        }
+
+        // 更新调度器状态显示
+        function updateSchedulerStatus(data) {
+            const statusBadge = document.getElementById('schedulerStatus');
+            const schedulerInfo = document.getElementById('schedulerInfo');
+
+            if (data.isRunning) {
+                statusBadge.textContent = '✅ 调度器运行中';
+                statusBadge.className = 'status-badge status-valid';
+            } else {
+                statusBadge.textContent = '⏸️ 调度器已停止';
+                statusBadge.className = 'status-badge status-invalid';
+            }
+
+            schedulerInfo.classList.remove('hidden');
+            document.getElementById('schedulerRunning').textContent = data.isRunning ? '运行中' : '已停止';
+            document.getElementById('checkinJobStatus').textContent = data.checkinJobStatus ? '运行中' : '已停止';
+
+            document.getElementById('nextCheckinTime').textContent = data.nextCheckinDate ?
+                new Date(data.nextCheckinDate).toLocaleString() : '-';
+
+            // 更新按钮状态
+            document.getElementById('startSchedulerBtn').disabled = data.isRunning;
+            document.getElementById('stopSchedulerBtn').disabled = !data.isRunning;
         }
 
         // 生成二维码
@@ -547,11 +617,104 @@
             }
         }
 
-        // 刷新Token状态
-        async function refreshTokenStatus() {
+        // 刷新状态
+        async function refreshStatus() {
             document.getElementById('refreshBtn').disabled = true;
-            await checkTokenStatus();
+            await Promise.all([
+                checkTokenStatus(),
+                checkSchedulerStatus()
+            ]);
             document.getElementById('refreshBtn').disabled = false;
+        }
+
+        // 触发定时签到
+        async function triggerScheduledCheckin() {
+            try {
+                document.getElementById('triggerCheckinBtn').disabled = true;
+                showMessage('正在触发定时签到...', 'success');
+
+                const response = await fetch('/api/trigger-checkin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage(data.message || '定时签到已触发', 'success');
+                } else {
+                    throw new Error(data.error || '触发定时签到失败');
+                }
+
+            } catch (error) {
+                console.error('Failed to trigger scheduled check-in:', error);
+                showMessage(`触发定时签到失败: ${error.message}`, 'error');
+            } finally {
+                document.getElementById('triggerCheckinBtn').disabled = false;
+            }
+        }
+
+      
+        // 启动调度器
+        async function startScheduler() {
+            try {
+                document.getElementById('startSchedulerBtn').disabled = true;
+                showMessage('正在启动调度器...', 'success');
+
+                const response = await fetch('/api/start-scheduler', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage(data.message || '调度器已启动', 'success');
+                    await checkSchedulerStatus();
+                } else {
+                    throw new Error(data.error || '启动调度器失败');
+                }
+
+            } catch (error) {
+                console.error('Failed to start scheduler:', error);
+                showMessage(`启动调度器失败: ${error.message}`, 'error');
+            } finally {
+                document.getElementById('startSchedulerBtn').disabled = false;
+            }
+        }
+
+        // 停止调度器
+        async function stopScheduler() {
+            try {
+                document.getElementById('stopSchedulerBtn').disabled = true;
+                showMessage('正在停止调度器...', 'success');
+
+                const response = await fetch('/api/stop-scheduler', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage(data.message || '调度器已停止', 'success');
+                    await checkSchedulerStatus();
+                } else {
+                    throw new Error(data.error || '停止调度器失败');
+                }
+
+            } catch (error) {
+                console.error('Failed to stop scheduler:', error);
+                showMessage(`停止调度器失败: ${error.message}`, 'error');
+            } finally {
+                document.getElementById('stopSchedulerBtn').disabled = false;
+            }
         }
 
         // 显示消息
@@ -626,10 +789,18 @@
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
             initSocket();
-            checkTokenStatus();
+            Promise.all([
+                checkTokenStatus(),
+                checkSchedulerStatus()
+            ]);
 
-            // 每30秒自动刷新Token状态
-            setInterval(checkTokenStatus, 30000);
+            // 每30秒自动刷新状态
+            setInterval(() => {
+                Promise.all([
+                    checkTokenStatus(),
+                    checkSchedulerStatus()
+                ]);
+            }, 30000);
         });
     </script>
 </body>

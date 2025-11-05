@@ -8,6 +8,7 @@ import TokenInfo from '@/lib/token-info';
 import { fetchUUID, pollWxCode } from '@/lib/wechat-utils';
 import { sendTokenExpiredEmail } from '@/lib/email-utils';
 import { getCheckInInfo, submitCheckIn } from '@/lib/checkin-utils';
+import { startScheduler, stopScheduler, getSchedulerStatus, triggerManualCheckin } from '@/lib/scheduler';
 import { log } from '@/utils/logger';
 import { validateConfig } from '@/utils/config';
 import { AppError, AuthenticationError } from '@/types';
@@ -92,6 +93,15 @@ async function startServer(port: number = 3000): Promise<void> {
     server.listen(port, () => {
       log.info(`QR Code server started on port ${port}`);
       console.log(`🌐 服务器运行在: http://localhost:${port}`);
+
+      // 启动定时任务调度器
+      try {
+        startScheduler();
+      } catch (schedulerError) {
+        const error = schedulerError instanceof Error ? schedulerError : new Error(String(schedulerError));
+        log.warn('Failed to start scheduler', { error: error.message });
+        console.warn('⚠️ 定时任务调度器启动失败，但服务器仍可正常使用');
+      }
     });
 
   } catch (error) {
@@ -409,12 +419,86 @@ setInterval(() => {
   }
 }, SESSION_CONFIG.CLEANUP_INTERVAL); // 使用配置的清理间隔
 
+/**
+ * 获取调度器状态API
+ */
+app.get('/api/scheduler-status', (_req, res) => {
+  try {
+    const status = getSchedulerStatus();
+    res.json(status);
+  } catch (error) {
+    log.error('Failed to get scheduler status', error instanceof Error ? error : new Error(String(error)));
+    res.status(500).json({ error: 'Failed to get scheduler status' });
+  }
+});
+
+/**
+ * 手动触发签到API
+ */
+app.post('/api/trigger-checkin', async (_req, res) => {
+  try {
+    await triggerManualCheckin();
+    res.json({
+      success: true,
+      message: '手动签到任务已触发'
+    });
+  } catch (error) {
+    log.error('Failed to trigger manual check-in', error instanceof Error ? error : new Error(String(error)));
+    res.status(500).json({
+      error: 'Failed to trigger check-in',
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+
+/**
+ * 启动调度器API
+ */
+app.post('/api/start-scheduler', (_req, res) => {
+  try {
+    startScheduler();
+    res.json({
+      success: true,
+      message: '调度器已启动'
+    });
+  } catch (error) {
+    log.error('Failed to start scheduler via API', error instanceof Error ? error : new Error(String(error)));
+    res.status(500).json({
+      error: 'Failed to start scheduler',
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+/**
+ * 停止调度器API
+ */
+app.post('/api/stop-scheduler', (_req, res) => {
+  try {
+    stopScheduler();
+    res.json({
+      success: true,
+      message: '调度器已停止'
+    });
+  } catch (error) {
+    log.error('Failed to stop scheduler via API', error instanceof Error ? error : new Error(String(error)));
+    res.status(500).json({
+      error: 'Failed to stop scheduler',
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
 // 增强的优雅关闭机制
 process.on('SIGTERM', () => {
   log.info('SIGTERM received, shutting down gracefully', {
     activeSessions: pollingSessions.size,
     totalCreatedSessions: sessionStats.totalSessions
   });
+
+  // 停止调度器
+  stopScheduler();
 
   server.close(() => {
     // 清理所有会话和定时器

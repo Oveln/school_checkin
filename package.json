@@ -26,6 +26,8 @@
 	"author": "",
 	"license": "ISC",
 	"dependencies": {
+		"@types/cron": "^2.4.3",
+		"cron": "^4.3.3",
 		"dotenv": "^17.2.3",
 		"express": "^5.1.0",
 		"jsqr": "^1.4.0",

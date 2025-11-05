@@ -2,7 +2,7 @@ import { createClient } from 'redis';
 import type { RedisClientType } from 'redis';
 import { fetchUUID, pollWxCode, fetchTokenByWxCode } from '@/lib/wechat-utils';
 import { printAsciiQRCode, fetchQRCodeBuffer } from '@/lib/qrcode-utils';
-import { sendEmailWithQRCode } from '@/lib/email-utils';
+import { sendEmailWithQRCode, sendTokenExpiredEmail } from '@/lib/email-utils';
 import {
   type TokenData,
   DEFAULT_TTL,
@@ -177,6 +177,37 @@ export class TokenInfo implements TokenData {
         log.info('Valid token found in Redis, no login required');
         console.log('✅ 检测到有效 Token，无需重新扫码。');
         return tokenInfo;
+      }
+
+      // 检查是否有过期的token（用于发送邮件提醒）
+      if (tokenInfo.token && tokenInfo.expire && tokenInfo.expire < Date.now()) {
+        log.warn('Token expired, sending notification email');
+        console.log('⚠️ Token 已过期，发送提醒邮件...');
+
+        // 发送过期提醒邮件，包含网页重新授权链接
+        try {
+          const reauthUrl = `http://localhost:${process.env['PORT'] || 3000}`;
+          await sendTokenExpiredEmail(reauthUrl);
+        } catch (emailError) {
+          log.warn('Failed to send token expired email', {}, emailError instanceof Error ? emailError : new Error(String(emailError)));
+        }
+      }
+
+      // 检查token是否即将过期（1小时内）
+      if (tokenInfo.token && tokenInfo.expire && tokenInfo.willExpireWithin(60 * 60 * 1000)) {
+        log.warn('Token will expire within 1 hour', {
+          expire: new Date(tokenInfo.expire).toISOString(),
+          timeUntilExpiry: tokenInfo.getTimeUntilExpiration()
+        });
+        console.log('⚠️ Token 将在1小时内过期，请注意及时更新');
+
+        // 发送即将过期提醒邮件
+        try {
+          const reauthUrl = `http://localhost:${process.env['PORT'] || 3000}`;
+          await sendTokenExpiredEmail(reauthUrl, true); // 标记为即将过期
+        } catch (emailError) {
+          log.warn('Failed to send token expiring soon email', {}, emailError instanceof Error ? emailError : new Error(String(emailError)));
+        }
       }
 
       log.info('Token invalid or missing, starting QR code login flow');

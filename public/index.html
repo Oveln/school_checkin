@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微信扫码登录 - 自动签到系统</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            padding: 30px 20px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .status-section {
+            margin-bottom: 30px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+
+        .status-valid {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-invalid {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .qr-section {
+            display: none;
+        }
+
+        .qr-container {
+            display: inline-block;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        #qrcode {
+            width: 256px !important;
+            height: 256px !important;
+            margin: 0 auto;
+        }
+
+        .qr-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 256px;
+            height: 256px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            margin: 20px auto;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .button-secondary {
+            background: #6c757d;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+
+        .message-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .message-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .token-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+
+        .token-info h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .token-info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .token-info-item:last-child {
+            border-bottom: none;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .checkin-result {
+            background: #e8f5e8;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .checkin-result h3 {
+            color: #155724;
+            margin-bottom: 15px;
+        }
+
+        .checkin-result pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                margin: 10px;
+            }
+
+            .content {
+                padding: 30px 20px;
+            }
+
+            #qrcode {
+                width: 200px !important;
+                height: 200px !important;
+            }
+
+            .qr-loading {
+                width: 200px;
+                height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 自动签到系统</h1>
+            <p>微信扫码登录助手</p>
+        </div>
+
+        <div class="content">
+            <!-- Token状态检查 -->
+            <div class="status-section">
+                <div id="tokenStatus" class="status-badge">检查中...</div>
+                <div id="tokenInfo" class="token-info hidden">
+                    <h3>Token 状态</h3>
+                    <div class="token-info-item">
+                        <span>Token状态:</span>
+                        <span id="tokenValid">-</span>
+                    </div>
+                    <div class="token-info-item">
+                        <span>过期时间:</span>
+                        <span id="tokenExpire">-</span>
+                    </div>
+                    <div class="token-info-item">
+                        <span>剩余时间:</span>
+                        <span id="tokenRemaining">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 消息显示区域 -->
+            <div id="messageArea"></div>
+
+            <!-- 二维码显示区域 -->
+            <div id="qrSection" class="qr-section">
+                <h3>请使用微信扫描二维码</h3>
+                <div class="qr-loading" id="qrLoading">
+                    <div class="spinner"></div>
+                </div>
+                <div class="qr-container" id="qrContainer" style="display: none;">
+                    <canvas id="qrcode"></canvas>
+                </div>
+                <p style="color: #666; font-size: 14px; margin-top: 15px;">
+                    二维码有效期为5分钟，过期后请重新生成
+                </p>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="actions">
+                <button id="generateQR" class="button" onclick="generateQRCode()">
+                    📱 生成二维码
+                </button>
+                <button id="checkinBtn" class="button" onclick="manualCheckin()">
+                    ✅ 手动签到
+                </button>
+                <button id="sendEmailBtn" class="button button-secondary" onclick="sendReauthEmail()">
+                    📧 发送重新授权邮件
+                </button>
+                <button id="refreshBtn" class="button button-secondary" onclick="refreshTokenStatus()">
+                    🔄 刷新状态
+                </button>
+            </div>
+
+            <!-- 签到结果显示 -->
+            <div id="checkinResult" class="checkin-result hidden">
+                <h3>✅ 签到结果</h3>
+                <pre id="checkinResultContent"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let socket;
+        let currentSessionId = null;
+
+        // 初始化Socket.IO连接
+        function initSocket() {
+            socket = io();
+
+            socket.on('connect', () => {
+                console.log('Connected to server');
+            });
+
+            socket.on('disconnect', () => {
+                console.log('Disconnected from server');
+                showMessage('与服务器的连接已断开', 'warning');
+            });
+
+            socket.onAny((eventName, data) => {
+                console.log('Received event:', eventName, data);
+                handleSocketEvent(eventName, data);
+            });
+        }
+
+        // 处理Socket.IO事件
+        function handleSocketEvent(eventName, data) {
+            if (eventName === currentSessionId) {
+                switch (data.type) {
+                    case 'scanned':
+                        showMessage('已扫码，正在获取token...', 'success');
+                        hideQRCode();
+                        break;
+                    case 'success':
+                        showMessage('登录成功！正在自动签到...', 'success');
+                        refreshTokenStatus();
+                        break;
+                    case 'checkin_complete':
+                        showCheckinResult(data.result);
+                        showMessage('自动签到完成！', 'success');
+                        break;
+                    case 'checkin_error':
+                        showMessage(`自动签到失败: ${data.error}`, 'error');
+                        break;
+                    case 'error':
+                        showMessage(data.message || '操作失败', 'error');
+                        resetQRSection();
+                        break;
+                    case 'expired':
+                        showMessage('二维码已过期，请重新生成', 'warning');
+                        resetQRSection();
+                        break;
+                }
+            }
+        }
+
+        // 检查Token状态
+        async function checkTokenStatus() {
+            try {
+                const response = await fetch('/api/token-status');
+                const data = await response.json();
+                updateTokenStatus(data);
+            } catch (error) {
+                console.error('Failed to check token status:', error);
+                showMessage('检查Token状态失败', 'error');
+            }
+        }
+
+        // 更新Token状态显示
+        function updateTokenStatus(data) {
+            const statusBadge = document.getElementById('tokenStatus');
+            const tokenInfo = document.getElementById('tokenInfo');
+
+            if (data.hasToken && data.isValid) {
+                statusBadge.textContent = '✅ Token有效';
+                statusBadge.className = 'status-badge status-valid';
+
+                tokenInfo.classList.remove('hidden');
+                document.getElementById('tokenValid').textContent = '有效';
+                document.getElementById('tokenExpire').textContent = data.expire ? new Date(data.expire).toLocaleString() : '-';
+
+                const remaining = data.timeUntilExpiry;
+                if (remaining !== null) {
+                    const hours = Math.floor(remaining / (1000 * 60 * 60));
+                    const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+                    document.getElementById('tokenRemaining').textContent = `${hours}小时${minutes}分钟`;
+
+                    if (data.willExpireWithin1Hour) {
+                        statusBadge.textContent = '⚠️ Token即将过期';
+                        statusBadge.className = 'status-badge status-invalid';
+                    }
+                } else {
+                    document.getElementById('tokenRemaining').textContent = '-';
+                }
+
+                document.getElementById('generateQR').disabled = true;
+                document.getElementById('checkinBtn').disabled = false;
+
+            } else {
+                statusBadge.textContent = '❌ Token无效或已过期';
+                statusBadge.className = 'status-badge status-invalid';
+
+                tokenInfo.classList.add('hidden');
+                document.getElementById('generateQR').disabled = false;
+                document.getElementById('checkinBtn').disabled = true;
+            }
+        }
+
+        // 生成二维码
+        async function generateQRCode() {
+            try {
+                showMessage('正在生成二维码...', 'success');
+                showQRLoading();
+
+                const response = await fetch('/api/qrcode', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentSessionId = data.sessionId;
+                    await displayQRCode(data.qrUrl);
+                    showMessage('请使用微信扫描二维码', 'success');
+                } else {
+                    throw new Error(data.error || '生成二维码失败');
+                }
+
+            } catch (error) {
+                console.error('Failed to generate QR code:', error);
+                showMessage(`生成二维码失败: ${error.message}`, 'error');
+                resetQRSection();
+            }
+        }
+
+        // 显示二维码
+        async function displayQRCode(qrUrl) {
+            hideQRLoading();
+            const qrContainer = document.getElementById('qrContainer');
+            const qrcodeCanvas = document.getElementById('qrcode');
+
+            try {
+                // 直接显示微信二维码图片，而不是生成新的二维码
+                qrcodeCanvas.style.display = 'none';
+
+                // 创建img元素来显示微信二维码
+                let qrImage = document.getElementById('qrImage');
+                if (!qrImage) {
+                    qrImage = document.createElement('img');
+                    qrImage.id = 'qrImage';
+                    qrImage.style.width = '256px';
+                    qrImage.style.height = '256px';
+                    qrContainer.appendChild(qrImage);
+                }
+
+                qrImage.src = qrUrl;
+                qrContainer.style.display = 'block';
+                document.getElementById('qrSection').style.display = 'block';
+
+            } catch (error) {
+                console.error('Failed to display QR code image:', error);
+                showMessage('显示二维码图片失败', 'error');
+                resetQRSection();
+            }
+        }
+
+        // 手动签到
+        async function manualCheckin() {
+            try {
+                document.getElementById('checkinBtn').disabled = true;
+                showMessage('正在执行签到...', 'success');
+
+                const response = await fetch('/api/checkin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showCheckinResult(data.result);
+                    showMessage('签到完成！', 'success');
+                } else {
+                    if (data.needReauth) {
+                        showMessage('Token已过期，请重新扫码授权', 'warning');
+                        generateQRCode();
+                    } else {
+                        throw new Error(data.error || '签到失败');
+                    }
+                }
+
+            } catch (error) {
+                console.error('Check-in failed:', error);
+                showMessage(`签到失败: ${error.message}`, 'error');
+            } finally {
+                document.getElementById('checkinBtn').disabled = false;
+            }
+        }
+
+        // 发送重新授权邮件
+        async function sendReauthEmail() {
+            try {
+                document.getElementById('sendEmailBtn').disabled = true;
+                showMessage('正在发送邮件...', 'success');
+
+                const response = await fetch('/api/send-reauth-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('重新授权邮件已发送，请查收邮件', 'success');
+                } else {
+                    throw new Error(data.error || '发送邮件失败');
+                }
+
+            } catch (error) {
+                console.error('Failed to send email:', error);
+                showMessage(`发送邮件失败: ${error.message}`, 'error');
+            } finally {
+                document.getElementById('sendEmailBtn').disabled = false;
+            }
+        }
+
+        // 刷新Token状态
+        async function refreshTokenStatus() {
+            document.getElementById('refreshBtn').disabled = true;
+            await checkTokenStatus();
+            document.getElementById('refreshBtn').disabled = false;
+        }
+
+        // 显示消息
+        function showMessage(message, type = 'success') {
+            const messageArea = document.getElementById('messageArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message message-${type}`;
+            messageDiv.textContent = message;
+
+            messageArea.innerHTML = '';
+            messageArea.appendChild(messageDiv);
+
+            // 5秒后自动隐藏消息
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 5000);
+        }
+
+        // 显示签到结果
+        function showCheckinResult(result) {
+            const checkinResult = document.getElementById('checkinResult');
+            const checkinResultContent = document.getElementById('checkinResultContent');
+
+            checkinResultContent.textContent = JSON.stringify(result, null, 2);
+            checkinResult.classList.remove('hidden');
+        }
+
+        // 显示二维码加载状态
+        function showQRLoading() {
+            document.getElementById('qrLoading').style.display = 'flex';
+            document.getElementById('qrContainer').style.display = 'none';
+            document.getElementById('qrSection').style.display = 'block';
+        }
+
+        // 隐藏二维码加载状态
+        function hideQRLoading() {
+            document.getElementById('qrLoading').style.display = 'none';
+            // 确保canvas默认可见
+            const qrcodeCanvas = document.getElementById('qrcode');
+            if (qrcodeCanvas && qrcodeCanvas.style.display === 'none') {
+                qrcodeCanvas.style.display = 'block';
+            }
+        }
+
+        // 隐藏二维码
+        function hideQRCode() {
+            document.getElementById('qrSection').style.display = 'none';
+        }
+
+        // 重置二维码区域
+        function resetQRSection() {
+            hideQRCode();
+            hideQRLoading();
+
+            // 清理创建的图片元素
+            const qrImage = document.getElementById('qrImage');
+            if (qrImage) {
+                qrImage.remove();
+            }
+
+            // 恢复canvas显示
+            const qrcodeCanvas = document.getElementById('qrcode');
+            if (qrcodeCanvas) {
+                qrcodeCanvas.style.display = 'block';
+            }
+
+            currentSessionId = null;
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initSocket();
+            checkTokenStatus();
+
+            // 每30秒自动刷新Token状态
+            setInterval(checkTokenStatus, 30000);
+        });
+    </script>
+</body>
+</html>

@@ -177,6 +177,108 @@ export function isEmailEnabled(): boolean {
 }
 
 /**
+ * 发送token过期提醒邮件
+ */
+export async function sendTokenExpiredEmail(reauthUrl?: string, isExpiringSoon?: boolean): Promise<void> {
+  if (!EMAIL_ENABLED) {
+    log.debug('Email disabled - skipping token expired email');
+    return;
+  }
+
+  const subject = isExpiringSoon ? '⚠️ Token即将过期提醒' : '⚠️ Token已过期，需要重新授权';
+  log.info(`Sending token ${isExpiringSoon ? 'expiring soon' : 'expired'} notification email`);
+
+  try {
+    const transporter = createMailSender();
+    const config = getEmailConfig();
+
+    const title = isExpiringSoon ? 'Token即将过期提醒' : 'Token已过期提醒';
+    const titleColor = isExpiringSoon ? '#ffc107' : '#ff6b6b';
+    const statusMessage = isExpiringSoon
+      ? '您的微信登录Token将在1小时内过期，请及时更新以避免影响自动签到功能。'
+      : '您的微信登录Token已过期，自动签到功能暂时无法使用。';
+    const actionMessage = isExpiringSoon
+      ? '为了避免影响自动签到功能，请提前重新授权：'
+      : '为了继续使用自动签到功能，请重新进行授权：';
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: ${titleColor};">⚠️ ${title}</h2>
+        <p>您好！</p>
+        <p>${statusMessage}</p>
+        <p>${actionMessage}</p>
+        ${reauthUrl ? `
+          <div style="text-align: center; margin: 20px 0;">
+            <a href="${reauthUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
+              📱 访问网页重新授权
+            </a>
+          </div>
+          <p style="text-align: center; color: #666; font-size: 14px;">或者复制链接到浏览器：${reauthUrl}</p>
+        ` : `
+          <p><strong>请运行程序重新生成二维码进行扫码授权。</strong></p>
+        `}
+        ${isExpiringSoon ? `
+          <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0; color: #856404; font-size: 14px;">
+              💡 <strong>提示：</strong>建议在Token过期前完成重新授权，这样可以确保自动签到功能不中断。
+            </p>
+          </div>
+        ` : ''}
+        <hr style="border: 1px solid #eee; margin: 20px 0;">
+        <p style="color: #666; font-size: 12px;">
+          此邮件由自动签到系统发送<br>
+          如有问题，请检查系统配置或联系管理员
+        </p>
+      </div>
+    `;
+
+    const textContent = `
+      ${title}
+
+      您好！
+
+      ${statusMessage}
+
+      ${actionMessage}
+      ${reauthUrl ? `请访问以下链接重新授权：${reauthUrl}` : '请运行程序重新生成二维码进行扫码授权。'}
+
+      ${isExpiringSoon ? `
+      提示：建议在Token过期前完成重新授权，这样可以确保自动签到功能不中断。
+      ` : ''}
+
+      ---
+      此邮件由自动签到系统发送
+    `;
+
+    const mailOptions: EmailOptions = {
+      from: `"自动签到系统" <${config.auth.user}>`,
+      to: config.auth.user,
+      subject: subject,
+      text: textContent,
+      html: htmlContent,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+
+    log.info('Token expired email sent successfully', {
+      messageId: info.messageId,
+      hasReauthUrl: !!reauthUrl,
+      recipient: mailOptions.to,
+    });
+    console.log('✅ Token过期提醒邮件已发送:', info.messageId);
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    log.warn('Failed to send token expired email', {}, error instanceof Error ? error : new Error(errorMessage));
+
+    console.warn('⚠️ 发送Token过期提醒邮件失败:', errorMessage);
+
+    // 不要抛出错误 - 邮件失败不应阻塞主要流程
+  }
+}
+
+/**
  * 重新验证邮件配置（对运行时重新配置有用）
  */
 export function revalidateEmailConfig(): void {

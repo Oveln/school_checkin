@@ -13,6 +13,8 @@ export const envConfigSchema = z.object({
   EMAIL_USER: z.string().optional(),
   EMAIL_PASS: z.string().optional(),
   EMAIL_TO: z.string().email().optional(),
+  REAUTH_URL: z.string().url().optional(),
+  EXPIRED_EMAIL_RECIPIENT: z.string().email().optional(),
 });
 
 // Token data validation

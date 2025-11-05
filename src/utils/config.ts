@@ -43,6 +43,8 @@ export class ConfigManager {
         EMAIL_USER: z.string().optional(),
         EMAIL_PASS: z.string().optional(),
         EMAIL_TO: z.string().email().optional(),
+        REAUTH_URL: z.string().url().optional(),
+        EXPIRED_EMAIL_RECIPIENT: z.string().email().optional(),
       });
 
       const result = envSchema.safeParse(process.env);
@@ -58,6 +60,8 @@ export class ConfigManager {
         hasRedisConfig: !!(this.config.REDIS_TOKEN && this.config.REDIS_ADDR),
         hasEmailConfig: !!(this.config.EMAIL_HOST && this.config.EMAIL_USER && this.config.EMAIL_PASS),
         emailRecipient: this.config.EMAIL_TO ? 'configured' : 'not configured',
+        reauthUrl: this.config.REAUTH_URL ? 'configured' : 'default',
+        expiredEmailRecipient: this.config.EXPIRED_EMAIL_RECIPIENT ? 'configured' : 'default',
       });
 
     } catch (error) {

@@ -44,8 +44,15 @@ async function performDailyCheckin(): Promise<void> {
       // 发送提醒邮件
       if (isEmailEnabled()) {
         try {
-          const reauthUrl = `http://localhost:${process.env['PORT'] || 3000}`;
-          await sendTokenExpiredEmail(reauthUrl);
+          const reauthUrl = process.env['REAUTH_URL'] || `http://localhost:${process.env['PORT'] || 3000}`;
+          const customRecipient = process.env['EXPIRED_EMAIL_RECIPIENT'];
+          const emailOptions: { reauthUrl: string; customRecipient?: string } = {
+            reauthUrl
+          };
+          if (customRecipient) {
+            emailOptions.customRecipient = customRecipient;
+          }
+          await sendTokenExpiredEmail(emailOptions);
           console.log('📧 已发送Token过期提醒邮件');
         } catch (emailError) {
           log.warn('Failed to send token expired email', {}, emailError instanceof Error ? emailError : new Error(String(emailError)));
@@ -76,8 +83,15 @@ async function performDailyCheckin(): Promise<void> {
     // 如果是认证错误，发送邮件提醒
     if (error instanceof AuthenticationError && isEmailEnabled()) {
       try {
-        const reauthUrl = `http://localhost:${process.env['PORT'] || 3000}`;
-        await sendTokenExpiredEmail(reauthUrl);
+        const reauthUrl = process.env['REAUTH_URL'] || `http://localhost:${process.env['PORT'] || 3000}`;
+        const customRecipient = process.env['EXPIRED_EMAIL_RECIPIENT'];
+        const emailOptions: { reauthUrl: string; customRecipient?: string } = {
+          reauthUrl
+        };
+        if (customRecipient) {
+          emailOptions.customRecipient = customRecipient;
+        }
+        await sendTokenExpiredEmail(emailOptions);
         console.log('📧 已发送认证失败提醒邮件');
       } catch (emailError) {
         log.warn('Failed to send auth failure email', {}, emailError instanceof Error ? emailError : new Error(String(emailError)));

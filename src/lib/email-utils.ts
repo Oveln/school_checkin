@@ -179,14 +179,22 @@ export function isEmailEnabled(): boolean {
 /**
  * 发送token过期提醒邮件
  */
-export async function sendTokenExpiredEmail(reauthUrl?: string, isExpiringSoon?: boolean): Promise<void> {
+export async function sendTokenExpiredEmail(options?: {
+  reauthUrl?: string;
+  isExpiringSoon?: boolean;
+  customRecipient?: string;
+}): Promise<void> {
   if (!EMAIL_ENABLED) {
     log.debug('Email disabled - skipping token expired email');
     return;
   }
 
+  const { reauthUrl, isExpiringSoon, customRecipient } = options || {};
   const subject = isExpiringSoon ? '⚠️ Token即将过期提醒' : '⚠️ Token已过期，需要重新授权';
-  log.info(`Sending token ${isExpiringSoon ? 'expiring soon' : 'expired'} notification email`);
+  log.info(`Sending token ${isExpiringSoon ? 'expiring soon' : 'expired'} notification email`, {
+    hasCustomRecipient: !!customRecipient,
+    hasReauthUrl: !!reauthUrl
+  });
 
   try {
     const transporter = createMailSender();
@@ -252,7 +260,7 @@ export async function sendTokenExpiredEmail(reauthUrl?: string, isExpiringSoon?:
 
     const mailOptions: EmailOptions = {
       from: `"自动签到系统" <${config.auth.user}>`,
-      to: config.auth.user,
+      to: customRecipient || config.auth.user,
       subject: subject,
       text: textContent,
       html: htmlContent,
@@ -264,6 +272,7 @@ export async function sendTokenExpiredEmail(reauthUrl?: string, isExpiringSoon?:
       messageId: info.messageId,
       hasReauthUrl: !!reauthUrl,
       recipient: mailOptions.to,
+      isCustomRecipient: !!customRecipient,
     });
     console.log('✅ Token过期提醒邮件已发送:', info.messageId);
 
